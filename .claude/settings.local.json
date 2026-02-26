@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:developers.tokkobroker.com)",
+      "Bash(curl:*)",
+      "Bash(cd \"E:/Mis Archivos/Documentos/1. work/1. Posicionarte/proyectos/tokkoBot\" && node test_tokko.js 2>&1)",
+      "Bash(cd \"E:/Mis Archivos/Documentos/1. work/1. Posicionarte/proyectos/tokkoBot\" && node test_tokko2.js 2>&1)",
+      "Bash(cd \"E:/Mis Archivos/Documentos/1. work/1. Posicionarte/proyectos/tokkoBot\" && node test_tokko3.js 2>&1)",
+      "Bash(cd \"E:/Mis Archivos/Documentos/1. work/1. Posicionarte/proyectos/tokkoBot\" && node test_tokko4.js 2>&1)",
+      "Bash(cd:*)"
+    ]
+  }
+}
