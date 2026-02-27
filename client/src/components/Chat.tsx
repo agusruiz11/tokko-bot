@@ -87,7 +87,7 @@ export function Chat() {
         inputRef.current?.focus()
       })
       .catch(() => {
-        setMessages([{ role: 'bot', text: '¡Hola! Bienvenido a Miguel Dodórico Propiedades. ¿En qué te puedo ayudar?' }])
+        setMessages([{ role: 'bot', text: "¡Hola! Bienvenido a Miguel D'Odorico Propiedades. ¿En qué te puedo ayudar?" }])
         setLoading(false)
       })
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -105,12 +105,12 @@ export function Chat() {
         <div className="bg-[#003BD3] px-4 py-3 flex items-center gap-3 shrink-0 shadow-md">
           <img
             src="/assets/logoMD.png"
-            alt="Miguel Dodórico"
+            alt="Miguel D'Odorico"
             className="w-14 h-14 object-contain shrink-0"
           />
           <div className="flex-1 min-w-0">
             <h1 className="text-white font-bold text-[15px] leading-tight truncate">
-              Miguel Dodórico Propiedades
+              Miguel D'Odorico Propiedades
             </h1>
             <p className="text-white/65 text-[12px] mt-0.5">
               Asistente virtual disponible 24hs

@@ -35,7 +35,7 @@ function escribir(texto) {
 
 function header() {
   escribir('─'.repeat(52) + '\n');
-  escribir('  Bot — Miguel Dodórico Propiedades\n');
+  escribir('  Bot — Miguel D'Odorico Propiedades\n');
   escribir('  Escribí "salir" para terminar\n');
   escribir('─'.repeat(52) + '\n\n');
 }

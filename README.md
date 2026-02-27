@@ -1,4 +1,4 @@
-# tokkoBot — Asistente Virtual para Miguel Dodórico Propiedades
+# tokkoBot — Asistente Virtual para Miguel D'Odorico Propiedades
 
 Bot conversacional 24hs que atiende clientes por **WhatsApp** e **Instagram**, consulta propiedades en tiempo real desde el CRM **Tokko Broker**, responde con inteligencia artificial (**Claude de Anthropic**) y guía al cliente hasta agendar una visita.
 
@@ -79,7 +79,7 @@ tokkoBot/
 │   │
 │   ├── public/                         # Build del frontend React (generado, no editar aquí)
 │   └── assets/
-│       └── logoMD.png                  # Logo de Miguel Dodórico Propiedades
+│       └── logoMD.png                  # Logo de Miguel D'Odorico Propiedades
 │
 ├── client/                             # Código fuente del frontend (React + Vite)
 │   ├── src/

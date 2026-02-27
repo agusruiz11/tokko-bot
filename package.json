@@ -1,7 +1,7 @@
 {
   "name": "tokkoBot",
   "version": "1.0.0",
-  "description": "Bot de atención automática 24hs para Miguel Dodórico Propiedades",
+  "description": "Bot de atención automática 24hs para Miguel D'Odorico Propiedades",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

@@ -14,9 +14,9 @@ const MAX_HISTORY = 30;
 const SEARCH_TOOL = {
   name: 'buscar_propiedades',
   description: [
-    'Busca propiedades disponibles en el catálogo de Miguel Dodórico Propiedades.',
-    'Usá esta herramienta cuando el cliente exprese intención de comprar, alquilar o ver propiedades.',
-    'Podés buscar con pocos filtros — no es necesario tener todos los datos.',
+    "Busca propiedades disponibles en el catálogo de Miguel D'Odorico Propiedades.",
+    "Usá esta herramienta cuando el cliente exprese intención de comprar, alquilar o ver propiedades.",
+    "Podés buscar con pocos filtros — no es necesario tener todos los datos.",
   ].join(' '),
   input_schema: {
     type: 'object',
@@ -79,16 +79,73 @@ async function executeTool(toolName, toolInput) {
   return { texto: resultado, propiedades };
 }
 
+// ─── Sanitización del historial ───────────────────────────────────────────────
+
+/**
+ * Elimina pares tool_use/tool_result incompletos del historial almacenado.
+ * Previene el error 400 "tool_use ids were found without tool_result blocks
+ * immediately after" cuando el historial guardado tiene una secuencia rota.
+ *
+ * Un par es válido sólo si:
+ *   - el mensaje del asistente tiene N bloques tool_use
+ *   - el mensaje de usuario siguiente tiene exactamente los N tool_result
+ *     con los IDs correspondientes
+ */
+function sanitizeHistorial(historial) {
+  if (!historial || historial.length === 0) return [];
+
+  const result = [];
+  let i = 0;
+
+  while (i < historial.length) {
+    const msg = historial[i];
+    const content = Array.isArray(msg.content) ? msg.content : [];
+    const toolUseIds = msg.role === 'assistant'
+      ? content.filter(b => b.type === 'tool_use').map(b => b.id)
+      : [];
+
+    if (toolUseIds.length > 0) {
+      // Verificar que el siguiente mensaje tiene TODOS los tool_result correspondientes
+      const next = historial[i + 1];
+      const nextContent = (next && Array.isArray(next.content)) ? next.content : [];
+      const nextResultIds = nextContent
+        .filter(b => b.type === 'tool_result')
+        .map(b => b.tool_use_id);
+
+      const allPaired = toolUseIds.every(id => nextResultIds.includes(id));
+
+      if (allPaired && next) {
+        result.push(msg, next);
+        i += 2;
+      } else {
+        // Par incompleto — descartar ambos para no enviar un tool_use sin tool_result
+        console.warn(`[AI] Historial sanitizado: par tool_use sin tool_result descartado (ids: ${toolUseIds.join(', ')})`);
+        i += (next && next.role === 'user') ? 2 : 1;
+      }
+    } else {
+      result.push(msg);
+      i++;
+    }
+  }
+
+  // Normalizar extremos: debe empezar con 'user' y terminar con 'assistant'
+  while (result.length > 0 && result[0].role !== 'user') result.shift();
+  while (result.length > 0 && result[result.length - 1].role !== 'assistant') result.pop();
+
+  return result;
+}
+
 // ─── Función principal ────────────────────────────────────────────────────────
 
 /**
  * Procesa un mensaje del usuario con Claude (tool use).
  *
  * Flujo:
- * 1. Armar el array de mensajes con el historial + mensaje actual
- * 2. Llamar a Claude
- * 3. Si Claude llama a buscar_propiedades → ejecutar → devolver resultado → continuar
- * 4. Retornar texto final + propiedades encontradas + historial actualizado
+ * 1. Sanitizar el historial para eliminar pares tool_use/tool_result incompletos
+ * 2. Armar el array de mensajes con el historial + mensaje actual
+ * 3. Llamar a Claude
+ * 4. Si Claude invoca herramientas → ejecutar TODAS → devolver TODOS los resultados → continuar
+ * 5. Retornar texto final + propiedades encontradas + historial actualizado
  *
  * @param {string}   userMessage - Texto del usuario
  * @param {Array}    historial   - Historial en formato Anthropic [{role, content}]
@@ -96,13 +153,12 @@ async function executeTool(toolName, toolInput) {
  */
 async function processMessage(userMessage, historial = []) {
   const messages = [
-    ...historial.slice(-MAX_HISTORY),
+    ...sanitizeHistorial(historial).slice(-MAX_HISTORY),
     { role: 'user', content: userMessage },
   ];
 
   let propiedadesEncontradas = [];
 
-  // Bucle para manejar múltiples tool calls (aunque con esta herramienta raramente pasa más de 1)
   // eslint-disable-next-line no-constant-condition
   while (true) {
     const response = await client.messages.create({
@@ -116,31 +172,34 @@ async function processMessage(userMessage, historial = []) {
     console.log(`[AI] Claude stop_reason: ${response.stop_reason} | tokens: ${response.usage?.input_tokens}in/${response.usage?.output_tokens}out`);
 
     if (response.stop_reason === 'tool_use') {
-      const toolBlock = response.content.find(b => b.type === 'tool_use');
+      // Claude puede invocar VARIAS herramientas en paralelo en un mismo turno.
+      // Hay que ejecutarlas TODAS y devolver un tool_result por cada una,
+      // en el mismo mensaje de usuario, antes de que el asistente pueda continuar.
+      const toolBlocks = response.content.filter(b => b.type === 'tool_use');
 
-      // Ejecutar la herramienta
-      const { texto: toolResultText, propiedades } = await executeTool(toolBlock.name, toolBlock.input);
-      propiedadesEncontradas = propiedades;
-
-      // Agregar el turno del asistente (que incluye el tool_use block) y el resultado
-      messages.push({ role: 'assistant', content: response.content });
-      messages.push({
-        role: 'user',
-        content: [{
+      const toolResults = [];
+      for (const toolBlock of toolBlocks) {
+        const { texto: toolResultText, propiedades } = await executeTool(toolBlock.name, toolBlock.input);
+        if (propiedades.length > 0) propiedadesEncontradas = propiedades;
+        toolResults.push({
           type:        'tool_result',
-          tool_use_id: toolBlock.id,
+          tool_use_id: toolBlock.id,   // mismo id que el tool_use correspondiente
           content:     toolResultText,
-        }],
-      });
+        });
+      }
 
-      // Continuar el bucle para que Claude genere la respuesta en lenguaje natural
+      // 1. Turno del asistente (contiene todos los tool_use blocks)
+      messages.push({ role: 'assistant', content: response.content });
+      // 2. Turno del usuario (contiene TODOS los tool_result, en el mismo mensaje)
+      messages.push({ role: 'user', content: toolResults });
+
+      // 3. Volver al inicio del bucle para que Claude genere la respuesta final
       continue;
     }
 
-    // stop_reason === 'end_turn' — respuesta final
+    // stop_reason === 'end_turn' — respuesta final en lenguaje natural
     const textoRespuesta = response.content.find(b => b.type === 'text')?.text || '';
 
-    // Agregar respuesta final al historial y recortar para no crecer indefinidamente
     messages.push({ role: 'assistant', content: response.content });
     const updatedHistorial = messages.slice(-MAX_HISTORY);
 
