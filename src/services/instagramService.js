@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const API_URL = 'https://graph.facebook.com/v19.0';
+const API_URL = 'https://graph.instagram.com/v21.0';
 
 function getHeaders() {
   return {
