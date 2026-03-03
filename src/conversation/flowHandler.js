@@ -41,9 +41,25 @@ async function handleMessage(userId, channel, text) {
       }
     }
 
-    // Enviar la respuesta de texto de Claude
-    if (respuesta) {
-      await sendMessage(channel, userId, respuesta);
+    // Separar URLs del texto para enviarlas como mensajes independientes
+    // (WhatsApp e Instagram muestran preview solo si la URL va sola en un mensaje)
+    const urlLineRegex = /^.*https?:\/\/\S+.*$/gm;
+    const urls = [];
+    const textoLimpio = respuesta
+      .replace(urlLineRegex, (line) => {
+        const match = line.match(/(https?:\/\/\S+)/);
+        if (match) urls.push(match[1]);
+        return '';
+      })
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    if (textoLimpio) {
+      await sendMessage(channel, userId, textoLimpio);
+    }
+
+    for (const url of urls) {
+      await sendMessage(channel, userId, url);
     }
 
   } catch (error) {
