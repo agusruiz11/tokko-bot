@@ -124,10 +124,6 @@ async function handleInstagramWebhook(req, res) {
 
   const body = req.body;
 
-  // Log temporal para diagnóstico — ver qué object type manda Meta
-  console.log('[Instagram] Payload recibido — object:', body.object, '| entry count:', body.entry?.length);
-  console.log('[Instagram] Entry[0]:', JSON.stringify(body.entry?.[0]));
-
   // Instagram usa object: "instagram" o "page" según la configuración
   if (body.object !== 'instagram' && body.object !== 'page') return;
 
