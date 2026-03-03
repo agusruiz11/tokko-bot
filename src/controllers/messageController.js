@@ -124,20 +124,22 @@ async function handleInstagramWebhook(req, res) {
 
   const body = req.body;
 
-  // Log temporal para diagnóstico — ver payload real de DMs
-  console.log('[Instagram] RAW payload:', JSON.stringify(body));
-
   // Instagram usa object: "instagram" o "page" según la configuración
   if (body.object !== 'instagram' && body.object !== 'page') return;
 
   try {
     for (const entry of body.entry || []) {
-      // La nueva API de Instagram usa formato changes[], igual que WhatsApp
-      for (const change of entry.changes || []) {
-        if (change.field !== 'messages') continue;
+      // Recolectar eventos de ambos formatos:
+      // - entry.messaging[] → Webhooks product (DMs reales)
+      // - entry.changes[].value → Casos de uso / test button
+      const events = [
+        ...(entry.messaging || []),
+        ...(entry.changes || [])
+          .filter(c => c.field === 'messages')
+          .map(c => c.value),
+      ];
 
-        const event = change.value;
-
+      for (const event of events) {
         if (!event.message) continue;
         if (event.message.is_echo) continue;
 
