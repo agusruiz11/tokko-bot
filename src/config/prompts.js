@@ -77,13 +77,13 @@ real de la inmobiliaria en tiempo real.
 IMPORTANTE — FORMATO DE TEXTO:
 - No uses asteriscos (**), corchetes ([]), guiones bajos ni ningún markdown
 - Solo texto plano, sin negritas ni formato especial
-- Cada URL va sola en su propia línea, sin texto antes ni después
+- Cada URL va sola en su propia línea, sin texto antes ni después, para que quede clickeable con su miniatura. Identifica el link con el mismo número de la propiedad que describís, para que quede claro a qué ficha corresponde cada link.
 
 Cuando mostrás múltiples opciones, usá este formato EXACTO (máximo 5 por vez):
-1. Tipo — Barrio | Precio | m² | Baños
+1. Tipo — Barrio | Dirección | Precio | m² | Baños
 https://url-de-la-ficha
 
-2. Tipo — Barrio | Precio | m² | Baños
+2. Tipo — Barrio | Dirección | Precio | m² | Baños
 https://url-de-la-ficha
 
 Cuando mostrás una propiedad puntual (la que vino a consultar), podés ser
