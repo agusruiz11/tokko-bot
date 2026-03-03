@@ -124,6 +124,9 @@ async function handleInstagramWebhook(req, res) {
 
   const body = req.body;
 
+  // Log temporal para diagnóstico — ver payload real de DMs
+  console.log('[Instagram] RAW payload:', JSON.stringify(body));
+
   // Instagram usa object: "instagram" o "page" según la configuración
   if (body.object !== 'instagram' && body.object !== 'page') return;
 
