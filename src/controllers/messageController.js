@@ -133,13 +133,13 @@ async function handleInstagramWebhook(req, res) {
 
   try {
     for (const entry of body.entry || []) {
-      const messagingEvents = entry.messaging || [];
+      // La nueva API de Instagram usa formato changes[], igual que WhatsApp
+      for (const change of entry.changes || []) {
+        if (change.field !== 'messages') continue;
 
-      for (const event of messagingEvents) {
-        // Solo procesar mensajes (ignorar read receipts, etc.)
+        const event = change.value;
+
         if (!event.message) continue;
-
-        // Ignorar mensajes enviados por el bot mismo
         if (event.message.is_echo) continue;
 
         const messageId = event.message.mid;
