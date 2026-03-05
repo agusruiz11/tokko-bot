@@ -7,7 +7,9 @@ const instagramRoutes = require('./routes/instagram');
 const path = require('path');
 
 const app = express();
-app.use(express.json());
+// Capturar el body crudo antes de parsearlo — necesario para verificar
+// la firma HMAC-SHA256 que Meta incluye en cada webhook POST.
+app.use(express.json({ verify: (req, _res, buf) => { req.rawBody = buf; } }));
 
 // ─── Frontend de demo ─────────────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, 'public')));
@@ -18,7 +20,11 @@ const { processMessage } = require('./services/aiService');
 const stateManager       = require('./conversation/stateManager');
 
 app.post('/chat', async (req, res) => {
-  const { userId = 'web-user', message } = req.body;
+  // Prefijar con "web-" para no colisionar con IDs de WhatsApp/Instagram,
+  // y sanitizar para rechazar caracteres de control o inyección.
+  const rawUserId = String(req.body.userId || 'anon').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
+  const userId = `web-${rawUserId}`;
+  const { message } = req.body;
   if (!message) return res.status(400).json({ error: 'Falta el campo message' });
 
   try {
@@ -37,7 +43,7 @@ app.post('/chat', async (req, res) => {
     });
   } catch (error) {
     console.error('[Chat] Error:', error.message);
-    res.status(500).json({ ok: false, error: error.message });
+    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 });
 
@@ -85,7 +91,8 @@ if (process.env.NODE_ENV !== 'production') {
       const resultado = await searchProperties(filters);
       res.json({ ok: true, filtros: filters, ...resultado });
     } catch (error) {
-      res.status(500).json({ ok: false, error: error.message });
+      console.error('[Dev/tokko/search] Error:', error.message);
+      res.status(500).json({ ok: false, error: 'Error interno del servidor' });
     }
   });
 
@@ -138,7 +145,8 @@ if (process.env.NODE_ENV !== 'production') {
         historialLen: resultado.updatedHistorial.length,
       });
     } catch (error) {
-      res.status(500).json({ ok: false, error: error.message });
+      console.error('[Dev/chat] Error:', error.message);
+      res.status(500).json({ ok: false, error: 'Error interno del servidor' });
     }
   });
 
