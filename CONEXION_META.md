@@ -23,6 +23,7 @@ cuentas sin errores.
 8. [Errores frecuentes y soluciones](#8-errores-frecuentes-y-soluciones)
 9. [Checklist para replicar en otra cuenta](#9-checklist-para-replicar-en-otra-cuenta)
 10. [Variables de entorno completas](#10-variables-de-entorno-completas)
+11. [Seguridad](#11-seguridad)
 
 ---
 
@@ -461,7 +462,8 @@ console.log('[Instagram] RAW payload:', JSON.stringify(req.body));
 - [ ] Agregar producto WhatsApp
 - [ ] Obtener token de acceso y Phone Number ID → `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`
 - [ ] Definir `WHATSAPP_VERIFY_TOKEN` (string inventado)
-- [ ] Configurar variables en Railway
+- [ ] **Obtener App Secret** → Meta for Developers → Configuración → Básico → App Secret → `META_APP_SECRET`
+- [ ] Configurar variables en Railway (incluir `META_APP_SECRET`)
 - [ ] Configurar webhook en Meta: `https://DOMINIO/webhook/whatsapp` + verify token
 - [ ] Suscribirse al campo `messages`
 - [ ] Agregar número de prueba en el sandbox
@@ -477,7 +479,8 @@ console.log('[Instagram] RAW payload:', JSON.stringify(req.body));
 - [ ] Agregar cuenta de Instagram → generar token → `INSTAGRAM_TOKEN`
 - [ ] Obtener IG User ID con el curl `/me` → `INSTAGRAM_PAGE_ID`
 - [ ] Definir `INSTAGRAM_VERIFY_TOKEN` (string inventado)
-- [ ] Configurar variables en Railway
+- [ ] **Obtener App Secret** → Meta for Developers → Configuración → Básico → App Secret → `META_APP_SECRET` (es la misma app, mismo secret)
+- [ ] Configurar variables en Railway (incluir `META_APP_SECRET`)
 - [ ] Configurar webhook en Paso 3 de Casos de uso (para el botón de prueba)
 - [ ] **Agregar producto Webhooks** separado → configurar Instagram → suscribir campo `messages`
 - [ ] Ejecutar curl de `/subscribed_apps` con el IG User ID y el token
@@ -511,9 +514,81 @@ INSTAGRAM_TOKEN=IGAABxxxxxxxxxxxx       # Token generado en Casos de uso > API d
 INSTAGRAM_VERIFY_TOKEN=igTokenSecreto  # Inventado, tiene que coincidir con Meta
 INSTAGRAM_PAGE_ID=25701990379503959     # IG User ID (verificar con /me endpoint)
 
+# Seguridad — firma de webhooks (OBLIGATORIO en producción)
+META_APP_SECRET=xxxxxxxxxxxxxxxxxxxxxxxx  # Meta for Developers → Configuración → Básico → App Secret
+
 # Notificaciones de escalado
 NOTIFY_EMAIL=contacto@agencia.com
 ```
+
+---
+
+## 11. SEGURIDAD
+
+### 11.1 Verificación de firma de webhooks (META_APP_SECRET)
+
+Meta firma cada POST de webhook con HMAC-SHA256 usando el **App Secret** de la app.
+El servidor verifica esa firma antes de procesar cualquier evento. Sin esta verificación,
+cualquiera que descubra la URL del webhook podría enviar eventos falsos y hacer que
+el bot responda a usuarios reales con mensajes inventados.
+
+**Cómo funciona:**
+
+1. Meta incluye en cada POST el header `X-Hub-Signature-256: sha256=<hash>`
+2. El servidor recalcula el hash con `HMAC-SHA256(raw_body, META_APP_SECRET)`
+3. Si no coinciden → `403`, el evento se descarta
+4. La comparación usa `crypto.timingSafeEqual` para evitar ataques de timing
+
+**Dónde obtener el App Secret:**
+
+Meta for Developers → seleccionar la app → **Configuración** → **Básico** →
+campo **App Secret** → click en "Mostrar" → copiar el valor.
+
+Guardarlo en Railway como `META_APP_SECRET`.
+
+**Comportamiento si la variable no está configurada:**
+
+Si `META_APP_SECRET` no está definida en Railway, la verificación se omite
+(el servidor acepta todos los webhooks). Esto permite el desarrollo local sin
+tener que replicar las firmas, pero **en producción siempre debe estar configurada**.
+
+**Cómo obtener el raw body para la verificación:**
+
+El middleware `express.json()` en `src/index.js` está configurado con la opción
+`verify` para capturar el body crudo antes de parsearlo como JSON:
+```javascript
+app.use(express.json({ verify: (req, _res, buf) => { req.rawBody = buf; } }));
+```
+Sin esto, Express descartaría el buffer y la verificación HMAC sería imposible.
+
+### 11.2 Aislamiento de sesiones del chat web
+
+El endpoint `POST /chat` (usado por el frontend de demo) acepta un `userId`
+del cliente. Para evitar que un usuario malicioso pase el número de teléfono
+de un cliente real y acceda o sobreescriba su historial de conversación,
+el servidor sanitiza y namespaca el ID:
+
+- Se acepta solo `[a-zA-Z0-9_-]` (máximo 64 caracteres)
+- Se antepone el prefijo `web-` automáticamente
+
+Así `userId: "5491134567890"` se convierte en `web-5491134567890`, que nunca
+colisiona con el ID de WhatsApp `"5491134567890"`.
+
+### 11.3 Errores internos no expuestos al cliente
+
+Los endpoints HTTP devuelven siempre `"Error interno del servidor"` en respuestas
+500, nunca el `error.message` real. El mensaje de error completo se loggea en
+los Deploy Logs de Railway para diagnóstico.
+
+### 11.4 Límite de memoria en el state manager
+
+El estado de conversaciones se guarda en memoria (Map). Para evitar que
+creación masiva de sesiones agote la RAM del servidor:
+
+- **Límite:** 10.000 conversaciones activas simultáneas
+- **TTL:** las sesiones sin actividad por más de 24 horas se eliminan
+- **Limpieza:** se ejecuta automáticamente cada 1 hora y también cuando
+  se intenta agregar una sesión nueva con el Map al límite
 
 ---
 
